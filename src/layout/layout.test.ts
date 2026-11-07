@@ -4,7 +4,7 @@ import { sampleProject } from '../model/sample-data';
 import type { Entry, Project } from '../model/types';
 import { computeLayout, LAYOUT } from './computeLayout';
 import { packLanes } from './lanes';
-import { ceilToUnit, createTimeScale, floorToUnit, generateTicks } from './scale';
+import { ceilToUnit, createTimeScale, effectiveScale, floorToUnit, generateTicks, labelStep } from './scale';
 import { estimateTextWidth } from './text';
 
 const d = (iso: string) => parseDay(iso)!;
@@ -194,5 +194,74 @@ describe('computeLayout', () => {
     expect(computeLayout(p, { width: 800, today: '2026-01-20' }).today).not.toBeNull();
     expect(computeLayout(p, { width: 800, today: '2030-01-01' }).today).toBeNull();
     expect(computeLayout({ ...p, settings: { ...p.settings, showToday: false } }, { width: 800, today: '2026-01-20' }).today).toBeNull();
+  });
+});
+
+describe('long spans', () => {
+  it('snaps to years and decades', () => {
+    expect(formatDay(floorToUnit(d('2026-11-07'), 'year'))).toBe('2026-01-01');
+    expect(formatDay(floorToUnit(d('2026-11-07'), 'decade'))).toBe('2020-01-01');
+    expect(formatDay(ceilToUnit(d('2026-11-07'), 'decade'))).toBe('2030-01-01');
+  });
+
+  it('labels decades and marks centuries as major', () => {
+    const ticks = generateTicks(d('1990-01-01'), d('2010-01-01'), 'decade');
+    expect(ticks.map((t) => t.label)).toEqual(['1990s', '2000s', '2010s']);
+    expect(ticks.map((t) => t.major)).toEqual([false, true, false]);
+  });
+
+  it('picks a readable automatic scale for the span', () => {
+    const w = 1000;
+    expect(effectiveScale('auto', 14, w)).toBe('day');
+    expect(effectiveScale('auto', 30, w)).toBe('week');
+    expect(effectiveScale('auto', 365, w)).toBe('month');
+    expect(effectiveScale('auto', 365 * 20, w)).toBe('year');
+    expect(effectiveScale('auto', 365 * 70, w)).toBe('decade');
+  });
+
+  it('keeps an explicit scale unless it would draw far too many lines', () => {
+    expect(effectiveScale('month', 365 * 5, 1000)).toBe('month');
+    expect(effectiveScale('day', 365 * 70, 1000)).toBe('year'); // 280 quarters would exceed 250 lines
+  });
+
+  it('thins labels to round steps', () => {
+    expect(labelStep('year', 3)).toBe(5);
+    expect(labelStep('month', 4)).toBe(6);
+    expect(labelStep('year', 70)).toBe(100);
+  });
+
+  const longProject = (spanYears?: number, spanStartYear?: number): Project => ({
+    ...project([e('early', '1960-03-01', '1965-06-30'), e('mid', '1990-01-01', '1990-01-01'), e('late', '2025-01-01', '2026-12-31')]),
+    settings: { overlapMode: 'sublanes', scale: 'auto', showToday: false, spanYears, spanStartYear },
+  });
+
+  it('fits a 67-year range with decade ticks and labelled years like 1960s', () => {
+    const r = computeLayout(longProject(), { width: 1200 });
+    expect(r.scale).toBe('decade');
+    expect(r.items).toHaveLength(3);
+    expect(r.ticks.filter((t) => t.showLabel).map((t) => t.label)).toContain('1990s');
+  });
+
+  it('shows a fixed 70-year window starting at the earliest entry by default', () => {
+    const r = computeLayout(longProject(70), { width: 1200 });
+    expect(r.domain).toEqual({ start: '1960-01-01', end: '2030-01-01' });
+    expect(r.outOfRange).toEqual([]);
+  });
+
+  it('hides entries outside a fixed window and clips partly visible bars', () => {
+    const r = computeLayout(longProject(5, 1962), { width: 1200 });
+    expect(r.domain).toEqual({ start: '1962-01-01', end: '1967-01-01' });
+    expect(r.outOfRange.sort()).toEqual(['late', 'mid']);
+    const early = r.items.find((i) => i.entryId === 'early')!;
+    expect(early.x).toBe(r.plot.x0); // starts before the window → clipped at the left edge
+    expect(early.start).toBe('1960-03-01'); // tooltip still shows the real dates
+  });
+
+  it('labels a 20-year span by year with round steps', () => {
+    const r = computeLayout(longProject(20, 2000), { width: 1200 });
+    expect(r.scale).toBe('year');
+    const labelled = r.ticks.filter((t) => t.showLabel).map((t) => Number(t.label));
+    expect(labelled.every((y) => y % labelStep('year', 1) === 0)).toBe(true);
+    expect(labelled[0]).toBe(2000);
   });
 });

@@ -1,8 +1,8 @@
-import { formatDay, parseDay, todayIso, type DayNumber } from '../model/dates';
-import { isMilestone, type Entry, type IsoDate, type Project } from '../model/types';
+import { dayParts, formatDay, fromParts, parseDay, todayIso, type DayNumber } from '../model/dates';
+import { isMilestone, type Entry, type IsoDate, type Project, type TimeScale } from '../model/types';
 import { isDrawable, validateEntry, type EntryIssue } from '../model/validation';
 import { packLanes, type Extent } from './lanes';
-import { ceilToUnit, createTimeScale, floorToUnit, generateTicks } from './scale';
+import { ceilToUnit, createTimeScale, effectiveScale, floorToUnit, generateTicks, labelStep } from './scale';
 import { estimateTextWidth } from './text';
 import type { AxisTick, LayoutItem, LayoutLabel, LayoutResult, LayoutRow } from './types';
 
@@ -56,7 +56,11 @@ export function computeLayout(project: Project, options: LayoutOptions): LayoutR
     else skipped.push(...validateEntry(e, timelines).filter((i) => i.field !== 'name'));
   }
 
-  // ---- Time domain, snapped to whole scale units with at least a day of breathing room.
+  const plotX0 = L.rowHeaderWidth;
+  const plotX1 = Math.max(options.width - L.rightPadding, plotX0 + L.minPlotWidth);
+
+  // ---- Time domain: either a fixed span of years, or fitted to the entries
+  //      (snapped to whole scale units, with at least a day of breathing room).
   const todayDay = parseDay(options.today ?? todayIso()) ?? parseDay(todayIso())!;
   let minDay: DayNumber;
   let maxDayExcl: DayNumber;
@@ -67,12 +71,30 @@ export function computeLayout(project: Project, options: LayoutOptions): LayoutR
     minDay = todayDay - 30;
     maxDayExcl = todayDay + 30;
   }
-  const domainStart = floorToUnit(minDay - 1, settings.scale);
-  const domainEnd = ceilToUnit(maxDayExcl + 1, settings.scale);
 
-  const plotX0 = L.rowHeaderWidth;
-  const plotX1 = Math.max(options.width - L.rightPadding, plotX0 + L.minPlotWidth);
+  let domainStart: DayNumber;
+  let domainEnd: DayNumber;
+  let unit: TimeScale;
+  if (settings.spanYears && settings.spanYears > 0) {
+    const startYear = settings.spanStartYear ?? dayParts(drawable.length > 0 ? minDay : todayDay).year;
+    domainStart = fromParts(startYear, 0, 1);
+    domainEnd = fromParts(startYear + settings.spanYears, 0, 1);
+    unit = effectiveScale(settings.scale, domainEnd - domainStart, plotX1 - plotX0);
+  } else {
+    unit = effectiveScale(settings.scale, maxDayExcl - minDay + 2, plotX1 - plotX0);
+    domainStart = floorToUnit(minDay - 1, unit);
+    domainEnd = ceilToUnit(maxDayExcl + 1, unit);
+  }
   const scale = createTimeScale(domainStart, domainEnd, plotX0, plotX1);
+
+  // Entries entirely outside a fixed span are not drawn; partly visible bars are clipped.
+  const outOfRange: string[] = [];
+  const visible = drawable.filter((e) => {
+    const s = parseDay(e.start)!;
+    const inside = isMilestone(e) ? s >= domainStart && s <= domainEnd : s < domainEnd && parseDay(e.end)! + 1 > domainStart;
+    if (!inside) outOfRange.push(e.id);
+    return inside;
+  });
 
   // ---- Rows and items
   const rows: LayoutRow[] = [];
@@ -80,8 +102,10 @@ export function computeLayout(project: Project, options: LayoutOptions): LayoutR
   let y = L.axisHeight;
 
   for (const tl of timelines) {
-    const entries = drawable.filter((e) => e.timelineId === tl.id);
-    const drafts = entries.map((e) => draftHorizontal(e, scale.toX, plotX0, plotX1, settings.overlapMode));
+    const entries = visible.filter((e) => e.timelineId === tl.id);
+    const drafts = entries.map((e) =>
+      draftHorizontal(e, scale.toX, [domainStart, domainEnd], plotX0, plotX1, settings.overlapMode),
+    );
 
     let laneOf: (d: Draft) => number;
     let laneCount: number;
@@ -140,7 +164,7 @@ export function computeLayout(project: Project, options: LayoutOptions): LayoutR
   }
 
   const plotY1 = y;
-  const ticks = buildTicks(domainStart, domainEnd, settings.scale, scale.toX, plotX1);
+  const ticks = buildTicks(domainStart, domainEnd, unit, scale.toX, plotX1);
   const today =
     settings.showToday && todayDay >= domainStart && todayDay <= domainEnd
       ? { x: scale.toX(todayDay), date: formatDay(todayDay) }
@@ -154,17 +178,20 @@ export function computeLayout(project: Project, options: LayoutOptions): LayoutR
     axis: { y: 0, height: L.axisHeight },
     rowHeader: { width: L.rowHeaderWidth },
     domain: { start: formatDay(domainStart), end: formatDay(domainEnd) },
+    scale: unit,
     rows,
     items,
     ticks,
     today,
     skipped,
+    outOfRange,
   };
 }
 
 function draftHorizontal(
   entry: Entry,
   toX: (d: DayNumber) => number,
+  [domainStart, domainEnd]: [DayNumber, DayNumber],
   plotX0: number,
   plotX1: number,
   mode: Project['settings']['overlapMode'],
@@ -189,8 +216,9 @@ function draftHorizontal(
     return { entry, kind: 'milestone', startDay, x: cx, width: L.milestoneSize, textWidth, label };
   }
 
-  const x = toX(startDay);
-  const width = Math.max(2, toX(parseDay(entry.end)! + 1) - x);
+  // Clip to the visible window.
+  const x = toX(Math.max(startDay, domainStart));
+  const width = Math.max(2, toX(Math.min(parseDay(entry.end)! + 1, domainEnd)) - x);
   let label: Draft['label'];
   if (textWidth + 2 * L.insidePadding <= width) {
     label = { text: entry.name, x: x + L.insidePadding, anchor: 'start', placement: 'inside' };
@@ -248,7 +276,7 @@ function assignAboveBelow(drafts: Draft[]): void {
 function buildTicks(
   startDay: DayNumber,
   endDay: DayNumber,
-  scaleUnit: Project['settings']['scale'],
+  scaleUnit: TimeScale,
   toX: (d: DayNumber) => number,
   plotX1: number,
 ): AxisTick[] {
@@ -256,12 +284,12 @@ function buildTicks(
   if (raw.length === 0) return [];
   const spacing = raw.length > 1 ? toX(raw[1]!.day) - toX(raw[0]!.day) : Infinity;
   const widest = Math.max(...raw.map((t) => estimateTextWidth(t.label, LAYOUT.fontSize)));
-  const every = Math.max(1, Math.ceil((widest + 12) / spacing));
+  const every = labelStep(scaleUnit, Math.max(1, Math.ceil((widest + 12) / spacing)));
 
-  return raw.map((t, i) => {
+  return raw.map((t) => {
     const x = toX(t.day);
     const fits = x + 4 + estimateTextWidth(t.label, LAYOUT.fontSize) <= plotX1;
-    return { x, date: formatDay(t.day), label: t.label, major: t.major, showLabel: i % every === 0 && fits };
+    return { x, date: formatDay(t.day), label: t.label, major: t.major, showLabel: t.seq % every === 0 && fits };
   });
 }
 

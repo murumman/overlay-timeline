@@ -1,8 +1,11 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { computeLayout } from './layout/computeLayout';
-import { sampleProject } from './model/sample-data';
-import type { OverlapMode, Project, TimeScale } from './model/types';
+import { applyFilter, isFilterActive } from './model/filter';
 import { TimelineSvg } from './render/TimelineSvg';
+import { useStore } from './state/store';
+import { EntryTable } from './ui/EntryTable';
+import { TimelinePanel } from './ui/TimelinePanel';
+import { Toolbar } from './ui/Toolbar';
 
 /** Width of an element, kept up to date as the window resizes. */
 function useElementWidth<T extends HTMLElement>() {
@@ -19,57 +22,67 @@ function useElementWidth<T extends HTMLElement>() {
 }
 
 export default function App() {
-  const [project, setProject] = useState<Project>(sampleProject);
+  const project = useStore((s) => s.project);
+  const selectedId = useStore((s) => s.selectedEntryId);
+  const select = useStore((s) => s.select);
+  const filter = useStore((s) => s.filter);
+  const resetFilter = useStore((s) => s.resetFilter);
+  const [message, setMessage] = useState<string | null>(null);
   const [chartRef, width] = useElementWidth<HTMLDivElement>();
-  const layout = useMemo(() => (width > 0 ? computeLayout(project, { width }) : null), [project, width]);
-
-  const setSettings = (patch: Partial<Project['settings']>) =>
-    setProject((p) => ({ ...p, settings: { ...p.settings, ...patch } }));
-  const { overlapMode, scale, showToday } = project.settings;
+  const filtered = useMemo(() => applyFilter(project, filter), [project, filter]);
+  const layout = useMemo(() => (width > 0 ? computeLayout(filtered, { width }) : null), [filtered, width]);
+  const filtering = isFilterActive(filter);
 
   return (
     <div className="app">
-      <header className="toolbar">
-        <h1>Overlay Timeline</h1>
-        <div className="segmented" role="group" aria-label="Overlap mode">
-          {(
-            [
-              ['sublanes', 'Auto sub-lanes'],
-              ['singleLine', 'One line'],
-            ] as [OverlapMode, string][]
-          ).map(([mode, text]) => (
-            <button key={mode} aria-pressed={overlapMode === mode} onClick={() => setSettings({ overlapMode: mode })}>
-              {text}
-            </button>
-          ))}
+      <Toolbar
+        onMessage={setMessage}
+        usedScale={layout?.scale}
+        firstYear={layout ? Number(layout.domain.start.slice(0, 4)) : undefined}
+      />
+
+      {message && (
+        <div className="message" role="status">
+          <span>{message}</span>
+          <button className="link" onClick={() => setMessage(null)}>
+            dismiss
+          </button>
         </div>
-        <label>
-          Scale{' '}
-          <select value={scale} onChange={(e) => setSettings({ scale: e.target.value as TimeScale })}>
-            <option value="day">Day</option>
-            <option value="week">Week</option>
-            <option value="month">Month</option>
-            <option value="quarter">Quarter</option>
-          </select>
-        </label>
-        <label>
-          <input type="checkbox" checked={showToday} onChange={(e) => setSettings({ showToday: e.target.checked })} />{' '}
-          Today line
-        </label>
-      </header>
+      )}
+
+      {filtering && (
+        <div className="filter-banner" role="status">
+          <span>
+            Filtered: showing {filtered.entries.length} of {project.entries.length} entries
+            {filtered.timelines.length < project.timelines.length &&
+              ` on ${filtered.timelines.length} of ${project.timelines.length} timelines`}
+            .
+          </span>
+          <button onClick={resetFilter}>✕ Reset filters</button>
+        </div>
+      )}
 
       <main className="chart" ref={chartRef}>
-        {layout && <TimelineSvg layout={layout} />}
+        {layout && <TimelineSvg layout={layout} selectedId={selectedId} onSelect={select} />}
         {layout && layout.skipped.length > 0 && (
-          <ul className="warnings">
-            {layout.skipped.map((s, i) => (
-              <li key={i}>
-                Entry {s.entryId}: {s.message}
-              </li>
-            ))}
-          </ul>
+          <p className="warnings">
+            {new Set(layout.skipped.map((s) => s.entryId)).size} entr
+            {new Set(layout.skipped.map((s) => s.entryId)).size === 1 ? 'y is' : 'ies are'} not shown because of
+            invalid dates or a missing timeline (marked red in the table).
+          </p>
+        )}
+        {layout && layout.outOfRange.length > 0 && (
+          <p className="hint chart-note">
+            {layout.outOfRange.length} entr{layout.outOfRange.length === 1 ? 'y lies' : 'ies lie'} outside the
+            chosen span and {layout.outOfRange.length === 1 ? 'is' : 'are'} not shown.
+          </p>
         )}
       </main>
+
+      <div className="editor">
+        <TimelinePanel />
+        <EntryTable />
+      </div>
     </div>
   );
 }

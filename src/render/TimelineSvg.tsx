@@ -16,9 +16,15 @@ export const THEME = {
   today: '#dc2626',
 } as const;
 
-type Props = { layout: LayoutResult; title?: string };
+type Props = {
+  layout: LayoutResult;
+  title?: string;
+  /** Interactive use only (omitted for exports): highlight one entry and report clicks. */
+  selectedId?: string | null;
+  onSelect?: (entryId: string | null) => void;
+};
 
-export function TimelineSvg({ layout, title = 'Timeline' }: Props) {
+export function TimelineSvg({ layout, title = 'Timeline', selectedId = null, onSelect }: Props) {
   const { width, height, plot, rows, items, ticks, today, fontSize } = layout;
   const T = THEME;
 
@@ -33,7 +39,7 @@ export function TimelineSvg({ layout, title = 'Timeline' }: Props) {
       role="img"
       aria-label={title}
     >
-      <rect x={0} y={0} width={width} height={height} fill={T.background} />
+      <rect x={0} y={0} width={width} height={height} fill={T.background} onClick={onSelect && (() => onSelect(null))} />
 
       {/* Row backgrounds and headers */}
       {rows.map((r, i) => (
@@ -68,8 +74,16 @@ export function TimelineSvg({ layout, title = 'Timeline' }: Props) {
       <line x1={plot.x0} x2={plot.x0} y1={plot.y0} y2={plot.y1} stroke={T.gridMajor} />
 
       {/* Entries: bars first, so milestones sit on top */}
-      {items.filter((i) => i.kind === 'bar').map((i) => <Bar key={i.entryId} item={i} />)}
-      {items.filter((i) => i.kind === 'milestone').map((i) => <Milestone key={i.entryId} item={i} />)}
+      {items
+        .filter((i) => i.kind === 'bar')
+        .map((i) => (
+          <Bar key={i.entryId} item={i} selected={i.entryId === selectedId} onSelect={onSelect} />
+        ))}
+      {items
+        .filter((i) => i.kind === 'milestone')
+        .map((i) => (
+          <Milestone key={i.entryId} item={i} selected={i.entryId === selectedId} onSelect={onSelect} />
+        ))}
 
       {today && (
         <g>
@@ -106,24 +120,46 @@ function Label({ item, color }: { item: LayoutItem; color: string }) {
   );
 }
 
-function Bar({ item: i }: { item: LayoutItem }) {
+type ItemProps = { item: LayoutItem; selected: boolean; onSelect?: (entryId: string) => void };
+
+/** Click handling + pointer cursor, only when the chart is interactive. */
+const interaction = (i: LayoutItem, onSelect?: (id: string) => void) =>
+  onSelect ? { onClick: () => onSelect(i.entryId), style: { cursor: 'pointer' } } : {};
+
+const SELECTED_STROKE = '#0f172a';
+
+function Bar({ item: i, selected, onSelect }: ItemProps) {
   const inside = i.label.placement === 'inside';
   return (
-    <g>
+    <g {...interaction(i, onSelect)}>
       <title>{tooltip(i)}</title>
-      <rect x={i.x} y={i.y} width={i.width} height={i.height} rx={4} fill={i.color} fillOpacity={i.opacity} />
+      <rect
+        x={i.x}
+        y={i.y}
+        width={i.width}
+        height={i.height}
+        rx={4}
+        fill={i.color}
+        fillOpacity={i.opacity}
+        {...(selected ? { stroke: SELECTED_STROKE, strokeWidth: 2 } : {})}
+      />
       <Label item={i} color={inside ? readableTextColor(i.color) : THEME.labelText} />
     </g>
   );
 }
 
-function Milestone({ item: i }: { item: LayoutItem }) {
+function Milestone({ item: i, selected, onSelect }: ItemProps) {
   const h = i.width / 2;
   const points = `${i.x},${i.y - h} ${i.x + h},${i.y} ${i.x},${i.y + h} ${i.x - h},${i.y}`;
   return (
-    <g>
+    <g {...interaction(i, onSelect)}>
       <title>{tooltip(i)}</title>
-      <polygon points={points} fill={i.color} stroke={THEME.background} strokeWidth={1.5} />
+      <polygon
+        points={points}
+        fill={i.color}
+        stroke={selected ? SELECTED_STROKE : THEME.background}
+        strokeWidth={selected ? 2 : 1.5}
+      />
       <Label item={i} color={THEME.labelText} />
     </g>
   );

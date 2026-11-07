@@ -33,5 +33,5 @@ export const sampleProject: Project = {
     { id: 'f3', name: 'Budget review', start: '2026-04-20', end: '2026-05-08', timelineId: 'finance' },
     { id: 'f4', name: 'Q2 close', start: '2026-06-30', end: '2026-06-30', timelineId: 'finance' },
   ],
-  settings: { overlapMode: 'sublanes', scale: 'month', showToday: true },
+  settings: { overlapMode: 'sublanes', scale: 'auto', showToday: true },
 };

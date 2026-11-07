@@ -24,13 +24,20 @@ export type Timeline = {
 };
 
 export type OverlapMode = 'sublanes' | 'singleLine';
-export type TimeScale = 'day' | 'week' | 'month' | 'quarter';
+export type TimeScale = 'day' | 'week' | 'month' | 'quarter' | 'year' | 'decade';
+/** Finest to coarsest. */
+export const TIME_SCALES: readonly TimeScale[] = ['day', 'week', 'month', 'quarter', 'year', 'decade'];
 
 export type Settings = {
   /** sublanes: overlapping entries stack inside their row. singleLine: everything on one line. */
   overlapMode: OverlapMode;
-  scale: TimeScale;
+  /** Tick unit of the time axis; 'auto' picks a readable one for the visible span. */
+  scale: TimeScale | 'auto';
   showToday: boolean;
+  /** Fixed visible span in years. Undefined = fit to the entries. */
+  spanYears?: number;
+  /** First year of the fixed span. Undefined = year of the earliest entry (or the current year). */
+  spanStartYear?: number;
 };
 
 export type Project = {

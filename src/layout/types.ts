@@ -1,4 +1,4 @@
-import type { IsoDate } from '../model/types';
+import type { IsoDate, TimeScale } from '../model/types';
 import type { EntryIssue } from '../model/validation';
 
 export type LabelPlacement = 'inside' | 'right' | 'left' | 'above' | 'below';
@@ -50,10 +50,14 @@ export type LayoutResult = {
   axis: { y: number; height: number };
   rowHeader: { width: number };
   domain: { start: IsoDate; end: IsoDate };
+  /** The tick unit actually used (resolves 'auto'). */
+  scale: TimeScale;
   rows: LayoutRow[];
   items: LayoutItem[];
   ticks: AxisTick[];
   today: { x: number; date: IsoDate } | null;
   /** Entries that could not be drawn, with the reasons. */
   skipped: EntryIssue[];
+  /** Ids of valid entries that lie entirely outside a fixed visible span. */
+  outOfRange: string[];
 };
