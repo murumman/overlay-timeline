@@ -1,27 +1,14 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { computeLayout } from './layout/computeLayout';
 import type { View } from './layout/zoom';
 import { applyFilter, isFilterActive } from './model/filter';
 import { useStore } from './state/store';
 import { ChartView } from './ui/ChartView';
+import { useElementWidth } from './ui/useElementWidth';
 import { useResolvedTheme } from './ui/useTheme';
 import { EntryTable } from './ui/EntryTable';
 import { TimelinePanel } from './ui/TimelinePanel';
 import { Toolbar } from './ui/Toolbar';
-
-/** Width of an element, kept up to date as the window resizes. */
-function useElementWidth<T extends HTMLElement>() {
-  const ref = useRef<T>(null);
-  const [width, setWidth] = useState(0);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([e]) => setWidth(Math.floor(e!.contentRect.width)));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  return [ref, width] as const;
-}
 
 export default function App() {
   const project = useStore((s) => s.project);

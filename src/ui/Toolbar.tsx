@@ -5,6 +5,9 @@ import { svgToPngBlob } from '../export/png';
 import { csvToEntries, projectToCsv } from '../io/csv';
 import { downloadBlob, downloadText, pickTextFile } from '../io/download';
 import { parseProjectJson, projectToJson } from '../io/json';
+import { buildViewUrl } from '../io/share';
+import { applyFilter } from '../model/filter';
+import { parseDay } from '../model/dates';
 import type { LayoutResult } from '../layout/types';
 import { todayIso } from '../model/dates';
 import type { OverlapMode, TimeScale } from '../model/types';
@@ -100,7 +103,35 @@ export function Toolbar({ onMessage, layout }: ToolbarProps) {
   // The SVG renderer pulls in react-dom/server, so it is only loaded when an export is used.
   const svgModule = () => import('../export/svg');
 
+  /** A read-only link to the chart as shown (filters, span and zoom applied). */
+  const copyViewLink = async () => {
+    if (!layout) return;
+    const { project, filter } = useStore.getState();
+    const shown = applyFilter(project, filter);
+    const view = layout.zoomed ? { start: parseDay(layout.domain.start)!, end: parseDay(layout.domain.end)! } : null;
+    const url = buildViewUrl(window.location.href, shown, view);
+    const local = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    const notes = [
+      `Anyone with this link can see these ${shown.entries.length} entries.`,
+      local ? 'Note: this link points to your own computer (localhost) and only works here. Use the published app to make links for Notion.' : 'In Notion, type /embed and paste the link.',
+      url.length > 8000 ? `The link is long (${url.length} characters); some apps may cut it off.` : '',
+    ].filter(Boolean);
+    try {
+      await navigator.clipboard.writeText(url);
+      onMessage(`View link copied. ${notes.join(' ')}`);
+    } catch {
+      window.prompt('Copy this view link:', url);
+      onMessage(notes.join(' '));
+    }
+  };
+
   const exportItems: MenuItem[] = [
+    { separator: 'Share' },
+    {
+      label: 'Copy view link',
+      hint: 'Read-only chart, e.g. for Notion /embed',
+      onSelect: run('Copying the link', copyViewLink),
+    },
     { separator: 'Chart (as shown, with filters)' },
     {
       label: 'PNG image',

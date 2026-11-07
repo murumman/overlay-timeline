@@ -28,4 +28,4 @@ Input → `model/` (Project, Entry, Timeline, Settings) → `layout/computeLayou
 ## Conventions
 - TypeScript strict, `noUncheckedIndexedAccess` on.
 - Tests sit next to code as `*.test.ts`. `model/sample-data.ts` is the shared visual test case.
-- Roadmap / phases: see the project plan (Phases 0–4 done; next is Phase 5: GitHub Pages + Notion embed).
+- Roadmap / phases: see the project plan (Phases 0–4 done; Phase 5: view links + GitHub Pages deploy).

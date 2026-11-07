@@ -12,7 +12,13 @@ export function projectToJson(p: Project, savedAt = new Date().toISOString()): s
 
 export type JsonImportResult = { ok: true; project: Project; warnings: string[] } | { ok: false; error: string };
 
+/** Limits for data from files or links, which may come from anyone. */
+const MAX_ITEMS = 5000;
+const MAX_TEXT = 300;
+const MAX_NOTES = 5000;
+
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+const isHexColor = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 
 /**
@@ -41,12 +47,12 @@ export function parseProjectJson(text: string, fallbackSettings: Settings): Json
   };
 
   const timelines: Timeline[] = [];
-  raw.timelines.forEach((t, i) => {
+  raw.timelines.slice(0, MAX_ITEMS).forEach((t, i) => {
     if (!isObj(t) || !str(t.name)) return void warnings.push(`Timeline #${i + 1} skipped (no name).`);
     timelines.push({
       id: uniqueId(t.id),
-      name: str(t.name)!,
-      color: /^#[0-9a-f]{6}$/i.test(str(t.color) ?? '') ? str(t.color)! : '#4b5563',
+      name: str(t.name)!.slice(0, MAX_TEXT),
+      color: isHexColor(t.color) ? t.color : '#4b5563',
       order: typeof t.order === 'number' ? t.order : i,
       ...(t.collapsed === true ? { collapsed: true } : {}),
     });
@@ -54,20 +60,21 @@ export function parseProjectJson(text: string, fallbackSettings: Settings): Json
 
   seen.clear();
   const entries: Entry[] = [];
-  raw.entries.forEach((e, i) => {
+  raw.entries.slice(0, MAX_ITEMS).forEach((e, i) => {
     if (!isObj(e) || str(e.start) === undefined || str(e.end) === undefined || !str(e.timelineId)) {
       return void warnings.push(`Entry #${i + 1} skipped (missing dates or timeline).`);
     }
     entries.push({
       id: uniqueId(e.id),
-      name: str(e.name) ?? '',
-      start: str(e.start)!,
-      end: str(e.end)!,
+      name: (str(e.name) ?? '').slice(0, MAX_TEXT),
+      start: str(e.start)!.slice(0, 10),
+      end: str(e.end)!.slice(0, 10),
       timelineId: str(e.timelineId)!,
-      ...(str(e.color) ? { color: str(e.color)! } : {}),
-      ...(str(e.notes) ? { notes: str(e.notes)! } : {}),
+      ...(isHexColor(e.color) ? { color: e.color } : {}),
+      ...(str(e.notes) ? { notes: str(e.notes)!.slice(0, MAX_NOTES) } : {}),
     });
   });
+  if (raw.entries.length > MAX_ITEMS) warnings.push(`Only the first ${MAX_ITEMS} entries were loaded.`);
 
   const s = isObj(raw.settings) ? raw.settings : {};
   const settings: Settings = {

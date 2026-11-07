@@ -10,6 +10,8 @@ type Props = {
   theme: 'light' | 'dark';
   /** Sets the zoom window; null = show the full range. */
   onViewChange: (view: View | null) => void;
+  /** View links: no selecting or folding (zoom still works). */
+  readOnly?: boolean;
 };
 
 const ZOOM_STEP = 1.5;
@@ -18,7 +20,7 @@ const DRAG_THRESHOLD_PX = 4;
 const toView = (d: { start: string; end: string }): View => ({ start: parseDay(d.start)!, end: parseDay(d.end)! });
 
 /** The interactive chart: selection, folding rows, zoom (buttons / Ctrl+wheel) and drag-to-pan. */
-export function ChartView({ layout, theme, onViewChange }: Props) {
+export function ChartView({ layout, theme, onViewChange, readOnly = false }: Props) {
   const selectedId = useStore((s) => s.selectedEntryId);
   const { select, toggleCollapsed } = useStore.getState();
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -86,9 +88,7 @@ export function ChartView({ layout, theme, onViewChange }: Props) {
       <TimelineSvg
         layout={layout}
         theme={theme === 'dark' ? DARK_THEME : LIGHT_THEME}
-        selectedId={selectedId}
-        onSelect={select}
-        onToggleRow={toggleCollapsed}
+        {...(readOnly ? {} : { selectedId, onSelect: select, onToggleRow: toggleCollapsed })}
       />
 
       <div className="zoom-controls" role="group" aria-label="Zoom">
