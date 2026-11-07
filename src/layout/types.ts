@@ -1,0 +1,59 @@
+import type { IsoDate } from '../model/types';
+import type { EntryIssue } from '../model/validation';
+
+export type LabelPlacement = 'inside' | 'right' | 'left' | 'above' | 'below';
+
+export type LayoutLabel = {
+  text: string;
+  /** Anchor point; `y` is the vertical centre of the text. */
+  x: number;
+  y: number;
+  anchor: 'start' | 'middle' | 'end';
+  placement: LabelPlacement;
+};
+
+export type LayoutItem = {
+  entryId: string;
+  timelineId: string;
+  kind: 'bar' | 'milestone';
+  name: string;
+  start: IsoDate;
+  end: IsoDate;
+  /** Bars: top-left corner + size. Milestones: centre point; width/height = diamond size. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  lane: number;
+  color: string;
+  opacity: number;
+  label: LayoutLabel;
+};
+
+export type LayoutRow = {
+  timelineId: string;
+  name: string;
+  color: string;
+  y: number;
+  height: number;
+  laneCount: number;
+};
+
+export type AxisTick = { x: number; date: IsoDate; label: string; showLabel: boolean; major: boolean };
+
+/** Pure geometry. Every renderer / exporter (SVG, PNG, HTML, draw.io) only translates this. */
+export type LayoutResult = {
+  width: number;
+  height: number;
+  fontSize: number;
+  plot: { x0: number; x1: number; y0: number; y1: number };
+  axis: { y: number; height: number };
+  rowHeader: { width: number };
+  domain: { start: IsoDate; end: IsoDate };
+  rows: LayoutRow[];
+  items: LayoutItem[];
+  ticks: AxisTick[];
+  today: { x: number; date: IsoDate } | null;
+  /** Entries that could not be drawn, with the reasons. */
+  skipped: EntryIssue[];
+};
