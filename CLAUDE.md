@@ -6,7 +6,7 @@ Entries with `start === end` are milestones (diamonds); others are bars. The end
 ## Commands
 - `npm run dev` – dev server at http://localhost:5173
 - `npm test` – unit tests (Vitest)
-- `npm run typecheck` – TypeScript check
+- `npm run typecheck` – TypeScript check (app + scripts)
 - `npm run build` – type check + production build to `dist/`
 
 ## Architecture
@@ -25,7 +25,13 @@ Input → `model/` (Project, Entry, Timeline, Settings) → `layout/computeLayou
 - Overlap modes: `sublanes` (greedy lane packing on shape+label extents, `layout/lanes.ts`) and
   `singleLine` (everything on lane 0, semi-transparent bars, labels alternate above/below).
 
+- Notion: no server. `scripts/notion-sync.ts` (run by the deploy workflow hourly, plain `node` with type stripping)
+  queries the databases in `notion.config.json` and writes `dist/notion/<slug>.json` + `index.json`;
+  the app loads them via `#notion=<slug>` (`io/notionSource.ts`). `io/notion.ts` (row → Project mapping) is
+  imported by that script, so it may only have `import type` imports. Copy only chart fields: the output is public.
+  Local test: `NOTION_TOKEN=… npm run notion-sync -- public` (public/notion is gitignored).
+
 ## Conventions
 - TypeScript strict, `noUncheckedIndexedAccess` on.
 - Tests sit next to code as `*.test.ts`. `model/sample-data.ts` is the shared visual test case.
-- Roadmap / phases: see the project plan (Phases 0–4 done; Phase 5: view links + GitHub Pages deploy).
+- Roadmap / phases: see the project plan (Phases 0–6 done). Live at https://murumman.github.io/overlay-timeline/.

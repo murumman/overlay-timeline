@@ -669,3 +669,8 @@ input[type='color'] {
   color: var(--text);
   font-size: 14px;
 }
+
+.view-loading {
+  margin: 24px;
+  color: var(--muted);
+}
