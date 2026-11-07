@@ -8,7 +8,7 @@ import { parseProjectJson, projectToJson } from '../io/json';
 import type { LayoutResult } from '../layout/types';
 import { todayIso } from '../model/dates';
 import type { OverlapMode, TimeScale } from '../model/types';
-import { useStore } from '../state/store';
+import { useStore, type ThemePreference } from '../state/store';
 import { Menu, type MenuItem } from './Menu';
 
 const MODES: [OverlapMode, string][] = [
@@ -35,6 +35,8 @@ type ToolbarProps = {
 
 export function Toolbar({ onMessage, layout }: ToolbarProps) {
   const settings = useStore((s) => s.project.settings);
+  const themePref = useStore((s) => s.theme);
+  const setTheme = useStore((s) => s.setTheme);
   const { setSettings, replaceData, replaceProject, loadSample, clearAll } = useStore.getState();
   /** Scale the chart actually uses (shown next to "Auto", or when a too-fine scale was coarsened). */
   const usedScale = layout?.scale;
@@ -223,6 +225,15 @@ export function Toolbar({ onMessage, layout }: ToolbarProps) {
       <label>
         <input type="checkbox" checked={settings.showToday} onChange={(e) => setSettings({ showToday: e.target.checked })} />{' '}
         Today line
+      </label>
+
+      <label title="Colour theme of the app (exports are always light)">
+        Theme{' '}
+        <select value={themePref} onChange={(e) => setTheme(e.target.value as ThemePreference)}>
+          <option value="system">Like Windows</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
       </label>
 
       <div className="toolbar-right">

@@ -10,6 +10,8 @@ export type LayoutLabel = {
   y: number;
   anchor: 'start' | 'middle' | 'end';
   placement: LabelPlacement;
+  /** Not drawn because there is no room (collapsed row, or crowded single line). The name stays in the tooltip. */
+  hidden?: boolean;
 };
 
 export type LayoutItem = {
@@ -33,6 +35,10 @@ export type LayoutItem = {
 export type LayoutRow = {
   timelineId: string;
   name: string;
+  /** The name as drawn: shortened with "…" if it does not fit the row header. */
+  label: string;
+  /** Folded into a thin summary strip without labels. */
+  collapsed: boolean;
   color: string;
   y: number;
   height: number;
@@ -50,6 +56,9 @@ export type LayoutResult = {
   axis: { y: number; height: number };
   rowHeader: { width: number };
   domain: { start: IsoDate; end: IsoDate };
+  /** The domain without zoom (fit to entries or fixed span). Equal to `domain` when not zoomed. */
+  baseDomain: { start: IsoDate; end: IsoDate };
+  zoomed: boolean;
   /** The tick unit actually used (resolves 'auto'). */
   scale: TimeScale;
   rows: LayoutRow[];

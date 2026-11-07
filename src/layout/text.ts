@@ -12,3 +12,17 @@ export function estimateTextWidth(text: string, fontSize: number): number {
   }
   return units * fontSize;
 }
+
+/**
+ * Shortens `text` with "…" so it fits in `maxWidth` pixels. Returns '' if not even
+ * one character plus the ellipsis fits.
+ */
+export function truncateText(text: string, maxWidth: number, fontSize: number): string {
+  if (estimateTextWidth(text, fontSize) <= maxWidth) return text;
+  const chars = [...text];
+  for (let n = chars.length - 1; n >= 1; n--) {
+    const candidate = chars.slice(0, n).join('').trimEnd() + '…';
+    if (estimateTextWidth(candidate, fontSize) <= maxWidth) return candidate;
+  }
+  return '';
+}

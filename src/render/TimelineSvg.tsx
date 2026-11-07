@@ -1,10 +1,27 @@
 import { parseDay } from '../model/dates';
-import type { LayoutItem, LayoutResult } from '../layout/types';
+import type { LayoutItem, LayoutResult, LayoutRow } from '../layout/types';
 import { readableTextColor } from './color';
 
 /** Colours used in the drawing. Inline attributes only (no CSS classes) so the SVG exports cleanly. */
-export const THEME = {
-  font: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+export type ChartTheme = {
+  font: string;
+  background: string;
+  rowStripe: string;
+  rowLine: string;
+  grid: string;
+  gridMajor: string;
+  axisText: string;
+  headerText: string;
+  labelText: string;
+  mutedText: string;
+  today: string;
+  selected: string;
+};
+
+const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+
+export const LIGHT_THEME: ChartTheme = {
+  font: FONT,
   background: '#ffffff',
   rowStripe: '#f8fafc',
   rowLine: '#e2e8f0',
@@ -13,20 +30,43 @@ export const THEME = {
   axisText: '#475569',
   headerText: '#0f172a',
   labelText: '#1e293b',
+  mutedText: '#94a3b8',
   today: '#dc2626',
-} as const;
+  selected: '#0f172a',
+};
+
+export const DARK_THEME: ChartTheme = {
+  font: FONT,
+  background: '#111827',
+  rowStripe: '#162033',
+  rowLine: '#1f2937',
+  grid: '#1c2636',
+  gridMajor: '#334155',
+  axisText: '#94a3b8',
+  headerText: '#e5e7eb',
+  labelText: '#e2e8f0',
+  mutedText: '#64748b',
+  today: '#f87171',
+  selected: '#f8fafc',
+};
+
+/** Exports always use the light theme (documents and slides are usually white). */
+export const THEME = LIGHT_THEME;
 
 type Props = {
   layout: LayoutResult;
   title?: string;
+  theme?: ChartTheme;
   /** Interactive use only (omitted for exports): highlight one entry and report clicks. */
   selectedId?: string | null;
   onSelect?: (entryId: string | null) => void;
+  /** Interactive use only: clicking a row name folds / unfolds the row. */
+  onToggleRow?: (timelineId: string) => void;
 };
 
-export function TimelineSvg({ layout, title = 'Timeline', selectedId = null, onSelect }: Props) {
+export function TimelineSvg({ layout, title = 'Timeline', theme = LIGHT_THEME, selectedId = null, onSelect, onToggleRow }: Props) {
   const { width, height, plot, rows, items, ticks, today, fontSize } = layout;
-  const T = THEME;
+  const T = theme;
 
   return (
     <svg
@@ -46,10 +86,7 @@ export function TimelineSvg({ layout, title = 'Timeline', selectedId = null, onS
         <g key={r.timelineId}>
           {i % 2 === 1 && <rect x={0} y={r.y} width={width} height={r.height} fill={T.rowStripe} />}
           <line x1={0} x2={width} y1={r.y + r.height} y2={r.y + r.height} stroke={T.rowLine} />
-          <rect x={12} y={r.y + r.height / 2 - 6} width={12} height={12} rx={3} fill={r.color} />
-          <text x={32} y={r.y + r.height / 2} dominantBaseline="central" fill={T.headerText} fontWeight={600}>
-            {r.name}
-          </text>
+          <RowHeader row={r} theme={T} onToggle={onToggleRow} />
         </g>
       ))}
 
@@ -77,12 +114,12 @@ export function TimelineSvg({ layout, title = 'Timeline', selectedId = null, onS
       {items
         .filter((i) => i.kind === 'bar')
         .map((i) => (
-          <Bar key={i.entryId} item={i} selected={i.entryId === selectedId} onSelect={onSelect} />
+          <Bar key={i.entryId} item={i} theme={T} selected={i.entryId === selectedId} onSelect={onSelect} />
         ))}
       {items
         .filter((i) => i.kind === 'milestone')
         .map((i) => (
-          <Milestone key={i.entryId} item={i} selected={i.entryId === selectedId} onSelect={onSelect} />
+          <Milestone key={i.entryId} item={i} theme={T} selected={i.entryId === selectedId} onSelect={onSelect} />
         ))}
 
       {today && (
@@ -105,6 +142,37 @@ export function TimelineSvg({ layout, title = 'Timeline', selectedId = null, onS
   );
 }
 
+function RowHeader({ row: r, theme: T, onToggle }: { row: LayoutRow; theme: ChartTheme; onToggle?: (id: string) => void }) {
+  const cy = r.y + r.height / 2;
+  const interactive = onToggle
+    ? { onClick: () => onToggle(r.timelineId), style: { cursor: 'pointer' }, role: 'button', 'aria-expanded': !r.collapsed }
+    : {};
+  return (
+    <g {...interactive}>
+      {(onToggle || r.label !== r.name) && (
+        <title>{`${r.name}${onToggle ? (r.collapsed ? ' – click to expand' : ' – click to collapse') : ''}`}</title>
+      )}
+      {/* Invisible hit area so the whole header is clickable */}
+      {onToggle && <rect x={0} y={r.y} width={150} height={r.height} fill="transparent" />}
+      {onToggle && (
+        <text x={7} y={cy} dominantBaseline="central" textAnchor="middle" fill={T.mutedText} fontSize={9}>
+          {r.collapsed ? '▶' : '▼'}
+        </text>
+      )}
+      <rect x={14} y={cy - 6} width={12} height={12} rx={3} fill={r.color} opacity={r.collapsed ? 0.6 : 1} />
+      <text
+        x={32}
+        y={cy}
+        dominantBaseline="central"
+        fill={r.collapsed ? T.mutedText : T.headerText}
+        fontWeight={600}
+      >
+        {r.label}
+      </text>
+    </g>
+  );
+}
+
 function tooltip(i: LayoutItem): string {
   if (i.kind === 'milestone') return `${i.name}\n${i.start}`;
   const days = parseDay(i.end)! - parseDay(i.start)! + 1;
@@ -113,6 +181,7 @@ function tooltip(i: LayoutItem): string {
 
 function Label({ item, color }: { item: LayoutItem; color: string }) {
   const l = item.label;
+  if (l.hidden) return null;
   return (
     <text x={l.x} y={l.y} textAnchor={l.anchor} dominantBaseline="central" fill={color}>
       {l.text}
@@ -120,15 +189,13 @@ function Label({ item, color }: { item: LayoutItem; color: string }) {
   );
 }
 
-type ItemProps = { item: LayoutItem; selected: boolean; onSelect?: (entryId: string) => void };
+type ItemProps = { item: LayoutItem; theme: ChartTheme; selected: boolean; onSelect?: (entryId: string) => void };
 
 /** Click handling + pointer cursor, only when the chart is interactive. */
 const interaction = (i: LayoutItem, onSelect?: (id: string) => void) =>
   onSelect ? { onClick: () => onSelect(i.entryId), style: { cursor: 'pointer' } } : {};
 
-const SELECTED_STROKE = '#0f172a';
-
-function Bar({ item: i, selected, onSelect }: ItemProps) {
+function Bar({ item: i, theme: T, selected, onSelect }: ItemProps) {
   const inside = i.label.placement === 'inside';
   return (
     <g {...interaction(i, onSelect)}>
@@ -138,17 +205,17 @@ function Bar({ item: i, selected, onSelect }: ItemProps) {
         y={i.y}
         width={i.width}
         height={i.height}
-        rx={4}
+        rx={Math.min(4, i.height / 2)}
         fill={i.color}
         fillOpacity={i.opacity}
-        {...(selected ? { stroke: SELECTED_STROKE, strokeWidth: 2 } : {})}
+        {...(selected ? { stroke: T.selected, strokeWidth: 2 } : {})}
       />
-      <Label item={i} color={inside ? readableTextColor(i.color) : THEME.labelText} />
+      <Label item={i} color={inside ? readableTextColor(i.color) : T.labelText} />
     </g>
   );
 }
 
-function Milestone({ item: i, selected, onSelect }: ItemProps) {
+function Milestone({ item: i, theme: T, selected, onSelect }: ItemProps) {
   const h = i.width / 2;
   const points = `${i.x},${i.y - h} ${i.x + h},${i.y} ${i.x},${i.y + h} ${i.x - h},${i.y}`;
   return (
@@ -157,10 +224,10 @@ function Milestone({ item: i, selected, onSelect }: ItemProps) {
       <polygon
         points={points}
         fill={i.color}
-        stroke={selected ? SELECTED_STROKE : THEME.background}
+        stroke={selected ? T.selected : T.background}
         strokeWidth={selected ? 2 : 1.5}
       />
-      <Label item={i} color={THEME.labelText} />
+      <Label item={i} color={T.labelText} />
     </g>
   );
 }

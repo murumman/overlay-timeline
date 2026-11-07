@@ -3,7 +3,7 @@ import { useStore } from '../state/store';
 export function TimelinePanel() {
   const project = useStore((s) => s.project);
   const shownIds = useStore((s) => s.filter.timelineIds);
-  const { addTimeline, updateTimeline, moveTimeline, deleteTimeline, toggleTimelineFilter, clearFilterField } =
+  const { addTimeline, updateTimeline, moveTimeline, deleteTimeline, toggleTimelineFilter, clearFilterField, toggleCollapsed } =
     useStore.getState();
   const timelines = [...project.timelines].sort((a, b) => a.order - b.order);
   const countFor = (id: string) => project.entries.filter((e) => e.timelineId === id).length;
@@ -34,6 +34,15 @@ export function TimelinePanel() {
       <ul>
         {timelines.map((t, i) => (
           <li key={t.id} className={shownIds?.length && !shownIds.includes(t.id) ? 'dimmed' : undefined}>
+            <button
+              className="fold"
+              aria-label={t.collapsed ? `Expand ${t.name}` : `Collapse ${t.name}`}
+              aria-expanded={!t.collapsed}
+              title={t.collapsed ? 'Expand this row in the chart' : 'Collapse this row to a thin strip'}
+              onClick={() => toggleCollapsed(t.id)}
+            >
+              {t.collapsed ? '▶' : '▼'}
+            </button>
             <input
               type="radio"
               name="timeline-only"

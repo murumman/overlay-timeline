@@ -1,8 +1,10 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { computeLayout } from './layout/computeLayout';
+import type { View } from './layout/zoom';
 import { applyFilter, isFilterActive } from './model/filter';
-import { TimelineSvg } from './render/TimelineSvg';
 import { useStore } from './state/store';
+import { ChartView } from './ui/ChartView';
+import { useResolvedTheme } from './ui/useTheme';
 import { EntryTable } from './ui/EntryTable';
 import { TimelinePanel } from './ui/TimelinePanel';
 import { Toolbar } from './ui/Toolbar';
@@ -23,14 +25,20 @@ function useElementWidth<T extends HTMLElement>() {
 
 export default function App() {
   const project = useStore((s) => s.project);
-  const selectedId = useStore((s) => s.selectedEntryId);
-  const select = useStore((s) => s.select);
   const filter = useStore((s) => s.filter);
   const resetFilter = useStore((s) => s.resetFilter);
   const [message, setMessage] = useState<string | null>(null);
   const [chartRef, width] = useElementWidth<HTMLDivElement>();
   const filtered = useMemo(() => applyFilter(project, filter), [project, filter]);
-  const layout = useMemo(() => (width > 0 ? computeLayout(filtered, { width }) : null), [filtered, width]);
+  const theme = useResolvedTheme();
+  // Zoom window: not saved, and reset when the span setting changes.
+  const [view, setView] = useState<View | null>(null);
+  const { spanYears, spanStartYear } = project.settings;
+  useEffect(() => setView(null), [spanYears, spanStartYear]);
+  const layout = useMemo(
+    () => (width > 0 ? computeLayout(filtered, { width, view }) : null),
+    [filtered, width, view],
+  );
   const filtering = isFilterActive(filter);
 
   return (
@@ -59,7 +67,7 @@ export default function App() {
       )}
 
       <main className="chart" ref={chartRef}>
-        {layout && <TimelineSvg layout={layout} selectedId={selectedId} onSelect={select} />}
+        {layout && <ChartView layout={layout} theme={theme} onViewChange={setView} />}
         {layout && layout.skipped.length > 0 && (
           <p className="warnings">
             {new Set(layout.skipped.map((s) => s.entryId)).size} entr
@@ -70,7 +78,8 @@ export default function App() {
         {layout && layout.outOfRange.length > 0 && (
           <p className="hint chart-note">
             {layout.outOfRange.length} entr{layout.outOfRange.length === 1 ? 'y lies' : 'ies lie'} outside the
-            chosen span and {layout.outOfRange.length === 1 ? 'is' : 'are'} not shown.
+            {layout.zoomed ? ' zoomed-in range' : ' chosen span'} and {layout.outOfRange.length === 1 ? 'is' : 'are'} not
+            shown.
           </p>
         )}
       </main>

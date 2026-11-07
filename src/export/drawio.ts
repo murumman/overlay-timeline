@@ -93,14 +93,14 @@ export function layoutToDrawio(layout: LayoutResult, title = 'Timeline', modifie
     const labelStyle = inside
       ? `fontColor=${readableTextColor(b.color)};align=left;verticalAlign=middle;spacingLeft=6;`
       : `fontColor=${T.labelText};${outsideLabelStyle(b.label)}`;
-    const style = `rounded=1;arcSize=22;fillColor=${b.color};strokeColor=none;${opacity}${font}whiteSpace=nowrap;${labelStyle}`;
+    const style = `rounded=1;arcSize=22;fillColor=${b.color};strokeColor=none;${opacity}${font}whiteSpace=nowrap;${labelStyle}${hiddenLabel(b)}`;
     cells.push(entryShape('bar', b.name, tooltip(b), style, b.x, b.y, b.width, b.height));
   }
   for (const m of layout.items.filter((i) => i.kind === 'milestone')) {
     const h = m.width / 2;
     const style =
       `rhombus;fillColor=${m.color};strokeColor=${T.background};strokeWidth=1.5;${font}` +
-      `fontColor=${T.labelText};whiteSpace=nowrap;${outsideLabelStyle(m.label)}`;
+      `fontColor=${T.labelText};whiteSpace=nowrap;${outsideLabelStyle(m.label)}${hiddenLabel(m)}`;
     cells.push(entryShape('milestone', m.name, tooltip(m), style, m.x - h, m.y - h, m.width, m.height));
   }
 
@@ -140,6 +140,9 @@ function outsideLabelStyle(l: LayoutLabel): string {
       return 'align=left;verticalAlign=middle;spacingLeft=6;';
   }
 }
+
+/** A label with no room keeps its text but is switched off (draw.io: Edit Style → remove noLabel). */
+const hiddenLabel = (i: LayoutItem) => (i.label.hidden ? 'noLabel=1;' : '');
 
 function tooltip(i: LayoutItem): string {
   if (i.kind === 'milestone') return `${i.name}\n${i.start}`;

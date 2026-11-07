@@ -19,10 +19,13 @@ Input → `model/` (Project, Entry, Timeline, Settings) → `layout/computeLayou
 - Dates are whole days: use `parseDay` / `formatDay` (UTC day numbers) from `model/dates.ts`; never `new Date("YYYY-MM-DD")` math.
 - Text width is estimated (`layout/text.ts`), not measured, to keep layout DOM-free.
 - `render/TimelineSvg.tsx` uses inline SVG attributes only (no CSS classes), so the SVG exports standalone.
+- Zoom is a transient `view` window passed to computeLayout (pure maths in `layout/zoom.ts`); `baseDomain` is the unzoomed range.
+- Themes: CSS variables switch on `<html data-theme>`; the chart gets LIGHT_THEME/DARK_THEME as a prop. Exports always use the light theme.
+- Labels that do not fit are shortened with "…" (`truncateText`) or marked `hidden` (still in the tooltip / draw.io `noLabel`).
 - Overlap modes: `sublanes` (greedy lane packing on shape+label extents, `layout/lanes.ts`) and
   `singleLine` (everything on lane 0, semi-transparent bars, labels alternate above/below).
 
 ## Conventions
 - TypeScript strict, `noUncheckedIndexedAccess` on.
 - Tests sit next to code as `*.test.ts`. `model/sample-data.ts` is the shared visual test case.
-- Roadmap / phases: see the project plan (Phase 1 core done; next is Phase 2 editor UI).
+- Roadmap / phases: see the project plan (Phases 0–4 done; next is Phase 5: GitHub Pages + Notion embed).

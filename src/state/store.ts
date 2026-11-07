@@ -6,8 +6,13 @@ import * as ops from '../model/operations';
 import { sampleProject } from '../model/sample-data';
 import type { Entry, Project, Settings, Timeline } from '../model/types';
 
+export type ThemePreference = 'system' | 'light' | 'dark';
+
 type State = {
   project: Project;
+  /** Viewer preference, saved in this browser but not part of the project data. */
+  theme: ThemePreference;
+  setTheme: (t: ThemePreference) => void;
   selectedEntryId: string | null;
   /** Applies to both the table and the chart. Not saved: every visit starts unfiltered. */
   filter: EntryFilter;
@@ -31,6 +36,8 @@ type State = {
   addTimeline: (name?: string) => string;
   updateTimeline: (id: string, patch: Partial<Omit<Timeline, 'id'>>) => void;
   moveTimeline: (id: string, delta: number) => void;
+  /** Folds a row into a thin strip, or unfolds it. */
+  toggleCollapsed: (id: string) => void;
   deleteTimeline: (id: string) => void;
 
   replaceData: (entries: Entry[], timelines: Timeline[]) => void;
@@ -48,6 +55,8 @@ export const useStore = create<State>()(
 
       return {
         project: sampleProject,
+        theme: 'system',
+        setTheme: (theme) => set({ theme }),
         selectedEntryId: null,
         filter: {},
 
@@ -94,6 +103,8 @@ export const useStore = create<State>()(
         },
         updateTimeline: (id, patch) => apply((p) => ops.updateTimeline(p, id, patch)),
         moveTimeline: (id, delta) => apply((p) => ops.moveTimeline(p, id, delta)),
+        toggleCollapsed: (id) =>
+          apply((p) => ops.updateTimeline(p, id, { collapsed: !p.timelines.find((t) => t.id === id)?.collapsed })),
         deleteTimeline: (id) =>
           set((s) => {
             const ids = s.filter.timelineIds?.filter((t) => t !== id);
@@ -116,7 +127,7 @@ export const useStore = create<State>()(
       name: 'overlay-timeline:project',
       version: 1,
       storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ project: s.project }),
+      partialize: (s) => ({ project: s.project, theme: s.theme }),
     },
   ),
 );
