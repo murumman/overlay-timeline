@@ -5,7 +5,7 @@ import { svgToPngBlob } from '../export/png';
 import { csvToEntries, projectToCsv } from '../io/csv';
 import { downloadBlob, downloadText, pickTextFile } from '../io/download';
 import { parseProjectJson, projectToJson } from '../io/json';
-import { loadSyncedIndex, loadSyncedNotion, notionLink, type SyncedIndex } from '../io/notionSource';
+import { loadSyncedNotion, notionSlugFromInput, syncPageUrl } from '../io/notionSource';
 import { buildViewUrl } from '../io/share';
 import { applyFilter } from '../model/filter';
 import { parseDay } from '../model/dates';
@@ -90,26 +90,14 @@ export function Toolbar({ onMessage, layout }: ToolbarProps) {
     onMessage(`Loaded ${n} entries from ${file.name}.` + (result.warnings.length ? ` Notes: ${result.warnings.join(' ')}` : ''));
   };
 
-  /** Asks which synced Notion database to use (no question when there is only one). */
-  const pickSynced = async (purpose: string): Promise<SyncedIndex[number] | null> => {
-    const list = await loadSyncedIndex(window.location.href);
-    if (list.length === 0) {
-      onMessage('No Notion database is synced yet. See “Notion” in the README for the one-time setup.');
-      return null;
-    }
-    if (list.length === 1) return list[0]!;
-    const answer = window.prompt(
-      `${purpose}: which database? Type its number:\n` + list.map((d, i) => `${i + 1}. ${d.title} (${d.entries} entries)`).join('\n'),
-      '1',
-    );
-    return answer ? (list[Number(answer) - 1] ?? null) : null;
-  };
-
+  /** Loads a synced Notion database into the editor. Asks for its live link, since names are secret. */
   const importNotion = async () => {
-    const db = await pickSynced('Load from Notion');
-    if (!db) return;
-    const result = await loadSyncedNotion(db.slug, window.location.href);
-    if (!result.ok) return onMessage(`Could not load “${db.title}”: ${result.error}`);
+    const input = window.prompt('Paste the live Notion link of the timeline (…#notion=…):');
+    if (!input) return;
+    const slug = notionSlugFromInput(input);
+    if (!slug) return onMessage('That is not a live Notion link. It looks like …/overlay-timeline/#notion=3f9a0c7e….');
+    const result = await loadSyncedNotion(slug, window.location.href);
+    if (!result.ok) return onMessage(`Could not load from Notion: ${result.error}`);
     const n = result.project.entries.length;
     if (
       useStore.getState().project.entries.length > 0 &&
@@ -125,18 +113,12 @@ export function Toolbar({ onMessage, layout }: ToolbarProps) {
     );
   };
 
-  const copyNotionLink = async () => {
-    const db = await pickSynced('Copy live link');
-    if (!db) return;
-    const url = notionLink(window.location.href, db.slug);
-    const note = `Live link for “${db.title}”: it always shows the latest sync. In Notion, type /embed and paste it.`;
-    try {
-      await navigator.clipboard.writeText(url);
-      onMessage(`Copied. ${note}`);
-    } catch {
-      window.prompt('Copy this link:', url);
-      onMessage(note);
-    }
+  /** Opens GitHub's "Run workflow" page; the sync itself needs the Notion key, which only GitHub has. */
+  const syncNotionNow = () => {
+    const url = syncPageUrl(window.location);
+    if (!url) return onMessage('Syncing works from the published app on GitHub Pages, not from this computer.');
+    window.open(url, '_blank', 'noopener');
+    onMessage('On the GitHub page, click “Run workflow” → “Run workflow”. After about a minute, reload the chart to see the new data.');
   };
 
   const fileName = (ext: string) => `timeline-${todayIso()}.${ext}`;
@@ -181,11 +163,6 @@ export function Toolbar({ onMessage, layout }: ToolbarProps) {
       label: 'Copy view link',
       hint: 'Read-only chart, e.g. for Notion /embed',
       onSelect: run('Copying the link', copyViewLink),
-    },
-    {
-      label: 'Copy live Notion link',
-      hint: 'Chart of a synced Notion database',
-      onSelect: run('Copying the link', copyNotionLink),
     },
     { separator: 'Chart (as shown, with filters)' },
     {
@@ -329,7 +306,9 @@ export function Toolbar({ onMessage, layout }: ToolbarProps) {
           items={[
             { label: 'CSV / Excel file', hint: 'Replace or add entries', onSelect: importCsv },
             { label: 'JSON backup', hint: 'Restore everything', onSelect: importJson },
-            { label: 'From Notion', hint: 'Latest synced copy of a Notion database', onSelect: run('Loading from Notion', importNotion) },
+            { separator: 'Notion' },
+            { label: 'From Notion', hint: 'Paste a live Notion link', onSelect: run('Loading from Notion', importNotion) },
+            { label: 'Sync Notion now ↗', hint: 'Re-read Notion (opens GitHub)', onSelect: syncNotionNow },
           ]}
         />
         <Menu label="Export" align="right" items={exportItems} />

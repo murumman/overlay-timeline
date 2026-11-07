@@ -25,9 +25,11 @@ Input → `model/` (Project, Entry, Timeline, Settings) → `layout/computeLayou
 - Overlap modes: `sublanes` (greedy lane packing on shape+label extents, `layout/lanes.ts`) and
   `singleLine` (everything on lane 0, semi-transparent bars, labels alternate above/below).
 
-- Notion: no server. `scripts/notion-sync.ts` (run by the deploy workflow hourly, plain `node` with type stripping)
-  queries the databases in `notion.config.json` and writes `dist/notion/<slug>.json` + `index.json`;
-  the app loads them via `#notion=<slug>` (`io/notionSource.ts`). `io/notion.ts` (row → Project mapping) is
+- Notion: no server. `scripts/notion-sync.ts` (run by the deploy workflow on push / manual "Run workflow", plain `node`)
+  queries the databases in the `NOTION_CONFIG` secret (locally: gitignored `notion.config.json`) and writes
+  `dist/notion/<link>.json`. Link names are random secrets: never commit them, never publish a list, and print no
+  names/titles/columns/ids when `CI=true` (public logs);
+  the app loads them via `#notion=<link>` (`io/notionSource.ts`). `io/notion.ts` (row → Project mapping) is
   imported by that script, so it may only have `import type` imports. Copy only chart fields: the output is public.
   Local test: `NOTION_TOKEN=… npm run notion-sync -- public` (public/notion is gitignored).
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadSyncedIndex, loadSyncedNotion, notionLink, notionSlug } from './notionSource';
+import { loadSyncedNotion, notionSlug, notionSlugFromInput, syncPageUrl } from './notionSource';
 
 const BASE = 'https://me.github.io/overlay-timeline/#notion=roadmap';
 
@@ -30,7 +30,9 @@ describe('notion links', () => {
     expect(notionSlug('#notion=roadmap')).toBe('roadmap');
     expect(notionSlug('#notion=../secret')).toBeNull();
     expect(notionSlug('#view=abc')).toBeNull();
-    expect(notionLink(BASE, 'team-a')).toBe('https://me.github.io/overlay-timeline/#notion=team-a');
+    expect(notionSlugFromInput(' https://me.github.io/overlay-timeline/#notion=3f9a0c7e1b2d4c6a8e0f1a2b ')).toBe('3f9a0c7e1b2d4c6a8e0f1a2b');
+    expect(notionSlugFromInput('3f9a0c7e1b2d4c6a8e0f1a2b')).toBe('3f9a0c7e1b2d4c6a8e0f1a2b');
+    expect(notionSlugFromInput('not a link')).toBeNull();
   });
 });
 
@@ -58,11 +60,11 @@ describe('loadSyncedNotion', () => {
   });
 });
 
-describe('loadSyncedIndex', () => {
-  it('lists synced databases, and is empty when nothing was synced', async () => {
-    const index = JSON.stringify({ databases: [{ slug: 'roadmap', title: 'Roadmap', savedAt: 'x', entries: 1 }, { slug: 5 }] });
-    const { fn } = fakeFetch({ 'https://me.github.io/overlay-timeline/notion/index.json': index });
-    expect((await loadSyncedIndex(BASE, fn)).map((d) => d.slug)).toEqual(['roadmap']);
-    expect(await loadSyncedIndex(BASE, fakeFetch({}).fn)).toEqual([]);
+describe('syncPageUrl', () => {
+  it('points to the workflow of the repo behind a GitHub Pages address', () => {
+    expect(syncPageUrl({ hostname: 'murumman.github.io', pathname: '/overlay-timeline/' })).toBe(
+      'https://github.com/murumman/overlay-timeline/actions/workflows/deploy.yml',
+    );
+    expect(syncPageUrl({ hostname: 'localhost', pathname: '/' })).toBeNull();
   });
 });

@@ -2,12 +2,13 @@ import type { Project } from '../model/types';
 import { parseProjectJson } from './json';
 
 /**
- * Loads Notion data that the GitHub sync published next to the app (notion/<slug>.json).
- * Live embed links look like …/overlay-timeline/#notion=<slug>.
+ * Loads Notion data that the GitHub sync published next to the app (notion/<link name>.json).
+ * Live embed links look like …/overlay-timeline/#notion=<link name>. The name is long and random and there is
+ * no list of names, so a chart can only be opened by someone who was given its link.
  */
 
 const PREFIX = '#notion=';
-const SLUG = /^[a-z0-9][a-z0-9-]{0,40}$/;
+const SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
 export const isNotionHash = (hash: string): boolean => hash.startsWith(PREFIX);
 
@@ -23,10 +24,24 @@ export function notionSlug(hash: string): string | null {
   return SLUG.test(slug) ? slug : null;
 }
 
-export const notionLink = (baseUrl: string, slug: string): string => `${baseUrl.split('#')[0]}${PREFIX}${slug}`;
+/** A pasted live link (…#notion=abc) or just its name → the name, or null. */
+export const notionSlugFromInput = (input: string): string | null => {
+  const t = input.trim();
+  const i = t.indexOf(PREFIX);
+  return notionSlug(i >= 0 ? t.slice(i) : PREFIX + t);
+};
+
+/**
+ * Where to start a sync: the "Run workflow" page of the deploy workflow on GitHub.
+ * Derived from the Pages address (<user>.github.io/<repo>/); null when running elsewhere.
+ */
+export function syncPageUrl(location: Pick<Location, 'hostname' | 'pathname'>): string | null {
+  const user = location.hostname.match(/^([a-z0-9-]+)\.github\.io$/i)?.[1];
+  const repo = location.pathname.split('/').filter(Boolean)[0];
+  return user && repo ? `https://github.com/${user}/${repo}/actions/workflows/deploy.yml` : null;
+}
 
 export type SyncedNotion = { ok: true; project: Project; title: string; savedAt: string | null; warnings: string[] } | { ok: false; error: string };
-export type SyncedIndex = { slug: string; title: string; savedAt: string; entries: number }[];
 
 type FetchFn = (url: string, init?: RequestInit) => Promise<Pick<Response, 'ok' | 'status' | 'text'>>;
 
@@ -59,19 +74,4 @@ export async function loadSyncedNotion(slug: string, baseUrl: string, fetchFn: F
     // parseProjectJson already accepted the file; the extras are optional.
   }
   return { ok: true, project: parsed.project, title, savedAt, warnings: parsed.warnings };
-}
-
-/** The databases the last sync published; empty when none (or when running locally without a sync). */
-export async function loadSyncedIndex(baseUrl: string, fetchFn: FetchFn = fetch): Promise<SyncedIndex> {
-  try {
-    const res = await fetchFn(fileUrl(baseUrl, 'index.json'), { cache: 'no-cache' });
-    if (!res.ok) return [];
-    const data = JSON.parse(await res.text()) as { databases?: unknown };
-    if (!Array.isArray(data.databases)) return [];
-    return data.databases.filter(
-      (d): d is SyncedIndex[number] => typeof d?.slug === 'string' && SLUG.test(d.slug) && typeof d.title === 'string',
-    );
-  } catch {
-    return [];
-  }
 }

@@ -1,0 +1,11 @@
+{
+  "databases": [
+    {
+      "label": "Roadmap",
+      "link": "PASTE-OUTPUT-OF-npm-run-notion-new-link",
+      "database": "https://www.notion.so/your-workspace/Roadmap-0123456789abcdef0123456789abcdef",
+      "properties": {},
+      "settings": {}
+    }
+  ]
+}

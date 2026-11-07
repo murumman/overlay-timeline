@@ -1,12 +1,10 @@
-# Tests, builds and publishes the app to GitHub Pages: on every push to main, every hour
-# (to pick up Notion changes), and on demand (Actions tab → "Run workflow").
+# Tests, builds and publishes the app to GitHub Pages: on every push to main, and on demand
+# (Actions tab → "Run workflow", or Import → "Sync Notion now" in the app), which also re-reads Notion.
 name: Deploy to GitHub Pages
 
 on:
   push:
     branches: [main]
-  schedule:
-    - cron: '17 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -30,12 +28,13 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      # Writes dist/notion/*.json for the databases in notion.config.json.
+      # Writes dist/notion/<link>.json for the databases in the NOTION_CONFIG secret.
       # If Notion fails, the job fails and the last published version stays online.
       - name: Sync Notion databases
         run: node scripts/notion-sync.ts dist
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_CONFIG: ${{ secrets.NOTION_CONFIG }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
