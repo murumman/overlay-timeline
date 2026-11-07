@@ -477,3 +477,66 @@ input[type='color'] {
 .timelines li.dimmed {
   opacity: 0.45;
 }
+
+/* ---------- Menus (Import / Export / Project) */
+
+.menu {
+  position: relative;
+}
+
+.menu-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  z-index: 30;
+  min-width: 260px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.15);
+}
+
+.menu-list.left {
+  left: 0;
+}
+
+.menu-list.right {
+  right: 0;
+}
+
+.menu-list button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 10px;
+  text-align: left;
+  background: none;
+}
+
+.menu-list button:hover,
+.menu-list button:focus-visible {
+  background: #f1f5f9;
+}
+
+.menu-list button small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.menu-separator {
+  padding: 8px 10px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.menu-separator:first-child {
+  padding-top: 2px;
+}

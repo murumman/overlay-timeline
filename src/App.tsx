@@ -35,11 +35,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <Toolbar
-        onMessage={setMessage}
-        usedScale={layout?.scale}
-        firstYear={layout ? Number(layout.domain.start.slice(0, 4)) : undefined}
-      />
+      <Toolbar onMessage={setMessage} layout={layout} />
 
       {message && (
         <div className="message" role="status">

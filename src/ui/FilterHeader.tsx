@@ -1,7 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { isFieldActive, type FilterField } from '../model/filter';
 import type { Timeline } from '../model/types';
 import { useStore } from '../state/store';
+import { useDismiss } from './useDismiss';
 
 type Props = {
   field: FilterField;
@@ -29,27 +30,8 @@ export function FilterHeader({ field, label, title, open, onOpenChange, timeline
   }, [open]);
 
   // Close on a click outside, on Escape, or when the page scrolls (the pop-up would drift).
-  useEffect(() => {
-    if (!open) return;
-    const close = () => onOpenChange(false);
-    const onDown = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) close();
-    };
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
-    const onScroll = (e: Event) => {
-      if (!popRef.current?.contains(e.target as Node)) close();
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    document.addEventListener('scroll', onScroll, true);
-    window.addEventListener('resize', close);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-      document.removeEventListener('scroll', onScroll, true);
-      window.removeEventListener('resize', close);
-    };
-  }, [open, onOpenChange]);
+  const close = useCallback(() => onOpenChange(false), [onOpenChange]);
+  useDismiss(open, close, ref, { closeOnScroll: true, scrollSafeRef: popRef });
 
   return (
     <th ref={ref} className="filter-th">

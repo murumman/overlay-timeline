@@ -34,6 +34,8 @@ type State = {
   deleteTimeline: (id: string) => void;
 
   replaceData: (entries: Entry[], timelines: Timeline[]) => void;
+  /** Replaces everything, including settings (used when loading a backup). */
+  replaceProject: (project: Project) => void;
   loadSample: () => void;
   clearAll: () => void;
 };
@@ -103,6 +105,7 @@ export const useStore = create<State>()(
 
         replaceData: (entries, timelines) =>
           set((s) => ({ project: { ...s.project, entries, timelines }, selectedEntryId: null, filter: {} })),
+        replaceProject: (project) => set({ project, selectedEntryId: null, filter: {} }),
         loadSample: () =>
           set((s) => ({ project: { ...sampleProject, settings: s.project.settings }, selectedEntryId: null, filter: {} })),
         clearAll: () => set((s) => ({ project: ops.emptyProject(s.project.settings), selectedEntryId: null, filter: {} })),
